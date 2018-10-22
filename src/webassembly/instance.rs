@@ -380,12 +380,14 @@ impl Instance {
                     // since the table just contains functions in the MVP
                     // we get the address of the specified function indexes
                     // to populate the table.
-
+                    println!("TABLE ELEMENT {:?}", table_element);
                     // let func_index = *elem_index - module.info.imported_funcs.len() as u32;
                     // let func_addr = functions[func_index.index()].as_ptr();
                     let func_addr = get_function_addr(&func_index, &import_functions, &functions);
+                    println!("TABLE OFFSET: {:?}", base + table_element.offset + i);
                     table[base + table_element.offset + i] = func_addr as _;
                 }
+                println!("table {:?}", table);
             }
         }
 
@@ -539,7 +541,7 @@ impl Instance {
             },
             phantom: PhantomData,
         };
-
+        println!("CONTEXT TABLES {:?}", tables);
         let main_heap_ptr = memories[0].as_mut_ptr() as *mut VmCtxData;
         unsafe {
             main_heap_ptr.sub(1).write(data);

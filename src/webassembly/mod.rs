@@ -75,6 +75,14 @@ pub fn compile(buffer_source: Vec<u8>) -> Result<Module, ErrorKind> {
     debug!("webassembly - creating module");
     let module = Module::from_bytes(buffer_source, triple!("x86_64"), None)?;
     debug!("webassembly - module created");
+    let tables: Vec<cranelift_wasm::Table> = module
+        .info
+        .tables
+        .iter()
+        .map(|table| table.entity)
+        .collect();
+    println!("TABLES {:?}", tables);
+    println!("TABLE ELEMENTS {:?}", module.info.table_elements);
 
     Ok(module)
 }

@@ -418,22 +418,22 @@ impl<'environment> FuncEnvironmentTrait for FuncEnvironment<'environment> {
         // let bound_gv = func.create_global_value(ir::GlobalValueData::Load {
         //     base: vmctx,
         //     offset: Offset32::new(0),
-        //     global_type: I32,
+        //     global_type: I64,
         // });
 
-        // func.create_table(ir::TableData {
+        // let table = func.create_table(ir::TableData {
         //     base_gv,
         //     min_size: Imm64::new(0),
         //     bound_gv,
         //     element_size: Imm64::new(i64::from(self.pointer_bytes()) * 2),
-        //     index_type: I32,
-        // })
-
+        //     index_type: I64,
+        // });
+        println!("MAKE TABLE {:?} {:?}", table_index, func);
         let ptr_size = self.ptr_size();
 
         let base = self.mod_info.tables_base.unwrap_or_else(|| {
-            let tables_offset = self.ptr_size() as i32 * -1;
-            let new_base = func.create_global_value(ir::GlobalValueData::VMContext {});
+            let tables_offset = ptr_size as i32 * -1;
+            let new_base = func.create_global_value(ir::GlobalValueData::VMContext);
             //  {
             //     offset: tables_offset.into(),
             // });
@@ -441,7 +441,7 @@ impl<'environment> FuncEnvironmentTrait for FuncEnvironment<'environment> {
             new_base
         });
 
-        let table_data_offset = (table_index as usize * ptr_size * 2) as i32;
+        let table_data_offset = (ptr_size * (2 * table_index as usize)) as i32;
 
         let new_table_addr_addr = func.create_global_value(ir::GlobalValueData::Load {
             base,
@@ -462,18 +462,18 @@ impl<'environment> FuncEnvironmentTrait for FuncEnvironment<'environment> {
         let new_table_bounds = func.create_global_value(ir::GlobalValueData::Load {
             base: new_table_bounds_addr,
             offset: 0.into(),
-            global_type: I32, // Might be self.pointer_type()
+            global_type: self.pointer_type(), // Might be self.pointer_type()
         });
 
         let table = func.create_table(ir::TableData {
             base_gv: new_table_addr,
-            min_size: Imm64::new(0),
-            // min_size: (self.mod_info.tables[table_index].size as i64).into(),
+            // min_size: Imm64::new(0),
+            min_size: (self.mod_info.tables[table_index].entity.size as i64).into(),
             bound_gv: new_table_bounds,
             element_size: (ptr_size as i64).into(),
-            index_type: I32,
+            index_type: I64,
         });
-
+        println!("TABLE {:?}", table);
         table
     }
 
@@ -500,45 +500,111 @@ impl<'environment> FuncEnvironmentTrait for FuncEnvironment<'environment> {
     fn translate_call_indirect(
         &mut self,
         mut pos: FuncCursor,
-        _table_index: TableIndex,
-        _table: ir::Table,
-        _sig_index: SignatureIndex,
+        table_index: TableIndex,
+        table: ir::Table,
+        sig_index: SignatureIndex,
         sig_ref: ir::SigRef,
         callee: ir::Value,
         call_args: &[ir::Value],
     ) -> WasmResult<ir::Inst> {
+        // OLD
+        // Pass the current function's vmctx parameter on to the callee.
+        // let vmctx = pos
+        //     .func
+        //     .special_param(ir::ArgumentPurpose::VMContext)
+        //     .expect("Missing vmctx parameter");
+
+        // // The `callee` value is an index into a table of function pointers.
+        // // Apparently, that table is stored at absolute address 0 in this dummy environment.
+        // // TODO: Generate bounds checking code.
+        // let ptr = self.pointer_type();
+        // let callee_offset = if ptr == I32 {
+        //     pos.ins().imul_imm(callee, 4)
+        // } else {
+        //     let ext = pos.ins().uextend(I64, callee);
+        //     pos.ins().imul_imm(ext, 4)
+        // };
+        // let mut mflags = ir::MemFlags::new();
+        // mflags.set_notrap();
+        // mflags.set_aligned();
+        // let func_ptr = pos.ins().load(ptr, mflags, callee_offset, 0);
+
+        // // Build a value list for the indirect call instruction containing the callee, call_args,
+        // // and the vmctx parameter.
+        // let mut args = ir::ValueList::default();
+        // args.push(func_ptr, &mut pos.func.dfg.value_lists);
+        // args.extend(call_args.iter().cloned(), &mut pos.func.dfg.value_lists);
+        // args.push(vmctx, &mut pos.func.dfg.value_lists);
+        // println!("POS {:?}", pos.func);
+        // Ok(pos
+        //     .ins()
+        //     .CallIndirect(ir::Opcode::CallIndirect, INVALID, sig_ref, args)
+        //     .0)
+        // TODO: Cranelift doesn't implement signature checking, so we need to implement it ourselves.
         // Pass the current function's vmctx parameter on to the callee.
         let vmctx = pos
             .func
             .special_param(ir::ArgumentPurpose::VMContext)
             .expect("Missing vmctx parameter");
 
-        // The `callee` value is an index into a table of function pointers.
-        // Apparently, that table is stored at absolute address 0 in this dummy environment.
-        // TODO: Generate bounds checking code.
-        let ptr = self.pointer_type();
-        let callee_offset = if ptr == I32 {
-            pos.ins().imul_imm(callee, 4)
+        // let ptr = self.pointer_type();
+        // let callee = if ptr != ir::types::I32 {
+        //     pos.ins().uextend(ptr, callee)
+        // } else {
+        //     callee
+        // };
+        // let callee = if ptr == ir::types::I32 {
+        //     pos.ins().imul_imm(callee, 4)
+        // } else {
+        //     let ext = pos.ins().uextend(I64, callee);
+        //     pos.ins().imul_imm(ext, 4)
+        // };
+
+        // let mut mflags = ir::MemFlags::new();
+        // mflags.set_notrap();
+        // mflags.set_aligned();
+
+        // let callee_func = pos.ins().load(ptr, mflags, callee, 0);
+        // let entry_addr = pos.ins().table_addr(ptr, table, callee, 0);
+
+        // let mut mflags = ir::MemFlags::new();
+        // mflags.set_notrap();
+        // mflags.set_aligned();
+
+        // let callee_func = pos.ins().load(self.pointer_type(), mflags, entry_addr, 0);
+        // let real_call_args = FuncEnvironment::get_real_call_args(pos.func, call_args);
+
+        let callee = if self.pointer_type() != ir::types::I32 {
+            // pos.ins().uextend(self.pointer_type(), callee)
+            pos.ins().iconst(I64, 0)
         } else {
-            let ext = pos.ins().uextend(I64, callee);
-            pos.ins().imul_imm(ext, 4)
+            callee
         };
-        let mut mflags = ir::MemFlags::new();
-        mflags.set_notrap();
-        mflags.set_aligned();
-        let func_ptr = pos.ins().load(ptr, mflags, callee_offset, 0);
+
+        let entry_addr = pos.ins().table_addr(self.pointer_type(), table, callee, 0);
+
+        let callee_func = pos
+            .ins()
+            .load(self.pointer_type(), ir::MemFlags::new(), entry_addr, 0);
 
         // Build a value list for the indirect call instruction containing the callee, call_args,
         // and the vmctx parameter.
+
         let mut args = ir::ValueList::default();
-        args.push(func_ptr, &mut pos.func.dfg.value_lists);
+        args.push(callee_func, &mut pos.func.dfg.value_lists);
         args.extend(call_args.iter().cloned(), &mut pos.func.dfg.value_lists);
         args.push(vmctx, &mut pos.func.dfg.value_lists);
+        // let sig_ref = self.vmctx_sig(sig_index);
 
-        Ok(pos
+        // pos.ins()
+        //     .trapz(callee_func, ir::TrapCode::IndirectCallToNull);
+
+        let x = pos
             .ins()
             .CallIndirect(ir::Opcode::CallIndirect, INVALID, sig_ref, args)
-            .0)
+            .0;
+        println!("POS {:?}", pos.func);
+        Ok(x)
     }
 
     fn translate_call(
