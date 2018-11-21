@@ -2,3 +2,6 @@
 	path = cranelift
 	url = git@github.com:WAFoundation/cranelift.git
 	fetchrecursesubmodules = true
+[submodule "emscripten"]
+	path = emscripten
+	url = git@github.com:WAFoundation/emscripten.git
