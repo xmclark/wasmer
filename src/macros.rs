@@ -37,3 +37,18 @@ macro_rules! debug {
     ($fmt:expr) => {};
     ($fmt:expr, $($arg:tt)*) => {};
 }
+
+
+// A macro to retrieve variadic arguments given a varargs offset
+#[macro_export]
+macro_rules! vararg {
+    ($name:ident, $type:ident, $instance:ident, $varargs:ident) => (
+        unsafe {
+            use std::ptr;
+            let ptr = $instance.memory_offset_addr(0, $varargs as usize);
+            let ret = ptr::read(ptr as *const $type);
+            $varargs += 4; /// NOTE: 32-bit offsets 
+            ret
+        };
+    )
+}
