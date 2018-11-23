@@ -1,6 +1,6 @@
 [submodule "cranelift"]
 	path = cranelift
-	url = git@github.com:WAFoundation/cranelift.git
+	url = https://github.com/wasmerio/cranelift.git
 	fetchrecursesubmodules = true
 [submodule "emscripten"]
 	path = emscripten
