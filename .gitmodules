@@ -4,4 +4,5 @@
 	fetchrecursesubmodules = true
 [submodule "emscripten"]
 	path = emscripten
-	url = git@github.com:WAFoundation/emscripten.git
+	url = https://github.com/wasmerio/emscripten.git
+	fetchrecursesubmodules = true
